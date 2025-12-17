@@ -734,7 +734,6 @@ st.markdown('</div>', unsafe_allow_html=True)
 # FOOTER
 # ---------------------------------------------------------
 st.markdown('<div class="footer">Smart Train Selector · AI-powered decision assistant for Indian Railways journeys</div>', unsafe_allow_html=True)
-=======
 # app.py
 
 import streamlit as st
