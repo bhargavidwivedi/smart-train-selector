@@ -1,7 +1,9 @@
 streamlit>=1.32.0
-pandas
-numpy
-joblib
-scikit-learn
-plotly
-
+pandas==2.3.3
+joblib==1.5.2
+numpy==1.26.4
+scikit-learn==1.2.2
+plotly==6.5.0
+altair==5.5.0
+pyarrow==22.0.0
+tqdm==4.66.1
