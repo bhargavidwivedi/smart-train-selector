@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # app.py
 
 import streamlit as st
@@ -1459,4 +1459,4 @@ st.markdown('</div>', unsafe_allow_html=True)
 # FOOTER
 # ---------------------------------------------------------
 st.markdown('<div class="footer">Smart Train Selector · AI-powered decision assistant for Indian Railways journeys</div>', unsafe_allow_html=True)
->>>>>>> bf64b65a77086264ba8623edacda9bc5819f6ee7
+
