@@ -1,16 +1,4 @@
-<<<<<<< HEAD
-
-streamlit
+streamlit==1.25.0
 pandas
-numpy
-scikit-learn
-joblib
-=======
-streamlit
-pandas
-numpy
-scikit-learn
-xgboost
 joblib
 plotly
->>>>>>> bf64b65a77086264ba8623edacda9bc5819f6ee7
