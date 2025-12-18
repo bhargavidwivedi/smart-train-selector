@@ -542,7 +542,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ---------------------------------------------------------
 # LOAD DATA & MODEL
 # ---------------------------------------------------------
-CSV_PATH = r"C:\\Users\\Aditya Dwivedi\\OneDrive\\Desktop\\IRCTC PROJECT\\smart-train-selector\\final_train_dataset_with_route.csv"
+CSV_PATH = r"C:\Users\Aditya Dwivedi\OneDrive\Desktop\IRCTC PROJECT\smart-train-selector\final_train_dataset_with_route.csv"
 df = pd.read_csv(CSV_PATH, low_memory=False)
 
 
