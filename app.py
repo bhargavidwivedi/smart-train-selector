@@ -1,5 +1,5 @@
 # app.py
-
+import os
 import streamlit as st
 import pandas as pd
 import joblib
@@ -542,15 +542,18 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ---------------------------------------------------------
 # LOAD DATA & MODEL
 # ---------------------------------------------------------
-CSV_PATH = r"C:\Users\Aditya Dwivedi\OneDrive\Desktop\IRCTC PROJECT\smart-train-selector\final_train_dataset_with_route.csv"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "final_train_dataset_with_route.csv")
 df = pd.read_csv(CSV_PATH, low_memory=False)
-
+MODEL_PATH = os.path.join(BASE_DIR, "train_confirmation_bundle.pkl")
+model_bundle = joblib.load(MODEL_PATH)
 
 df.columns = df.columns.str.strip().str.lower()
 for col in ["source", "destination", "train_type", "class", "train_name"]:
     df[col] = df[col].astype(str).str.strip()
 
-MODEL_PATH = r"C:\\Users\\Aditya Dwivedi\\OneDrive\\Desktop\\IRCTC PROJECT\\smart-train-selector\\train_confirmation_bundle.pkl"
+MODEL_PATH = os.path.join(BASE_DIR, "train_confirmation_bundle.pkl")
+
 model_bundle = joblib.load(MODEL_PATH)
 
 model = model_bundle["model"]
@@ -745,3 +748,4 @@ st.markdown(
     '<div class="footer">Smart Train Selector · AI-powered decision assistant for Indian Railways journeys</div>',
     unsafe_allow_html=True
 )
+c
