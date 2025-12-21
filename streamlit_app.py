@@ -6,6 +6,38 @@ import joblib
 from datetime import datetime
 import plotly.graph_objects as go
 import os
+import requests
+
+
+# ----------------------------------------
+# LIVE TRAIN STATUS FUNCTION
+def get_live_train_status(train_no, rapidapi_key):
+    url = "https://irctc1.p.rapidapi.com/api/v1/getLiveTrainStatus"
+
+    querystring = {
+        "trainNo": str(train_no),
+        "startDay": "1"
+    }
+
+    headers = {
+        "X-RapidAPI-Key": rapidapi_key,
+        "X-RapidAPI-Host": "irctc1.p.rapidapi.com"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                return data.get("data", {})
+            else:
+                return {"error": "No live data available"}
+        else:
+            return {"error": f"API returned status code {response.status_code}"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
 st.set_page_config(
     page_title="Smart Train Selector",
@@ -708,10 +740,12 @@ if predict_btn:
         else:
             st.markdown("#### 🚆 Recommended trains for your journey")
 
+            # ✅ Correctly indented for loop
             for idx, row in top_trains.iterrows():
                 is_best = idx == top_trains.index[0]
                 probability_value = row.pred_prob * 100
 
+                # Train card HTML
                 st.markdown(
                     f"""
                     <div class="train-card">
@@ -740,8 +774,10 @@ if predict_btn:
                     unsafe_allow_html=True
                 )
 
+                # Gauge chart
                 probability_gauge(row.pred_prob, key=f"gauge_{row.train_no}_{idx}")
 
+                # Confirmation chance message
                 if row.pred_prob >= 0.75:
                     st.success("High confirmation chance – strongly recommended.")
                 elif row.pred_prob >= 0.45:
@@ -750,6 +786,18 @@ if predict_btn:
                     st.info("Low confirmation chance – book only if flexible with plans.")
 
                 st.divider()
+
+                # Live train status
+                rapidapi_key = "34556d9462msh33dac86393efc71p1d1a90jsnda9e34a609f8"  
+                live_status = get_live_train_status(row.train_no, rapidapi_key)
+
+                if "error" in live_status:
+                    st.info(f"Live status not available: {live_status['error']}")
+                else:
+                    st.markdown(f"**Current station:** {live_status.get('currentStation', 'N/A')}")
+                    st.markdown(f"**Late by:** {live_status.get('lateBy', 'N/A')} minutes")
+                    st.markdown(f"**Next station:** {live_status.get('nextStation', 'N/A')}")
+
 
 st.markdown('</div>', unsafe_allow_html=True)
 
