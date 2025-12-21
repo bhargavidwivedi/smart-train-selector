@@ -1,19 +1,64 @@
+
 # app.py
-import os
 import streamlit as st
 import pandas as pd
 import joblib
 from datetime import datetime
 import plotly.graph_objects as go
+import os
+import requests
 
-# ---------------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------------
+
+# ----------------------------------------
+# LIVE TRAIN STATUS FUNCTION
+def get_live_train_status(train_no, rapidapi_key):
+    url = "https://irctc1.p.rapidapi.com/api/v1/getLiveTrainStatus"
+
+    querystring = {
+        "trainNo": str(train_no),
+        "startDay": "1"
+    }
+
+    headers = {
+        "X-RapidAPI-Key": rapidapi_key,
+        "X-RapidAPI-Host": "irctc1.p.rapidapi.com"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                return data.get("data", {})
+            else:
+                return {"error": "No live data available"}
+        else:
+            return {"error": f"API returned status code {response.status_code}"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
 st.set_page_config(
     page_title="Smart Train Selector",
     page_icon="🚆",
     layout="centered"
 )
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_PATH = os.path.join(BASE_DIR, "final_train_dataset_with_route.csv")
+MODEL_PATH = os.path.join(BASE_DIR, "train_confirmation_bundle.pkl")
+
+if not os.path.exists(CSV_PATH):
+    st.error(f"CSV file not found: {CSV_PATH}")
+    st.stop()
+
+df = pd.read_csv(CSV_PATH, low_memory=False)
+model_bundle = joblib.load(MODEL_PATH)
+
+
+
+
 
 # ---------------------------------------------------------
 # GLOBAL STYLES – COPILOT-STYLE PREMIUM DASHBOARD
@@ -541,20 +586,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # LOAD DATA & MODEL
-# ---------------------------------------------------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_PATH = os.path.join(BASE_DIR, "final_train_dataset_with_route.csv")
-df = pd.read_csv(CSV_PATH, low_memory=False)
-MODEL_PATH = os.path.join(BASE_DIR, "train_confirmation_bundle.pkl")
-model_bundle = joblib.load(MODEL_PATH)
 
-df.columns = df.columns.str.strip().str.lower()
-for col in ["source", "destination", "train_type", "class", "train_name"]:
-    df[col] = df[col].astype(str).str.strip()
-
-MODEL_PATH = os.path.join(BASE_DIR, "train_confirmation_bundle.pkl")
-
-model_bundle = joblib.load(MODEL_PATH)
 
 model = model_bundle["model"]
 train_type_le = model_bundle["train_type_le"]
@@ -570,13 +602,21 @@ st.markdown('<div class="journey-subtitle">Describe your trip and I’ll compare
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    user_class = st.selectbox("🎟️ Class", sorted(df["class"].unique()))
+    user_class = st.selectbox(
+    "🎟️ Class",
+    sorted(df["class"].astype(str).unique())
+)
+
 
 with col2:
-    source = st.selectbox("📍 Source Station", sorted(df["source"].unique()))
+    source = st.selectbox("📍 Source Station", sorted(df["source"].astype(str).unique()))
 
 with col3:
-    destination = st.selectbox("🚉 Destination Station", sorted(df["destination"].unique()))
+     destination = st.selectbox(
+    "🚉 Destination Station", 
+    sorted(df["destination"].astype(str).unique())
+)
+
 
 journey_date = st.date_input("📅 Journey Date", datetime.today())
 
@@ -594,28 +634,19 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ---------------------------------------------------------
 def get_top_trains(df_route, user_class_value):
     user_class_encoded = class_mapping[user_class_value]
-
     df_local = df_route.copy()
 
-    # ------------------- FIX: Convert numeric columns -------------------
-    numeric_cols = [
-        "duration_hours", "avg_delay_min", "wl_position", "halts",
-        "route_congestion", "days_before_journey", "train_frequency"
-    ]
+    # Convert numeric columns to proper types
+    numeric_cols = ["duration_hours", "wl_position", "avg_delay_min", "halts", "route_congestion", "days_before_journey"]
     for col in numeric_cols:
-        if col in df_local.columns:
-            df_local[col] = pd.to_numeric(df_local[col], errors="coerce").fillna(0)
+        df_local[col] = pd.to_numeric(df_local[col], errors="coerce").fillna(0)
 
-    # ------------------- FIX: Convert object/bool columns ----------------
-    if "weekday" in df_local.columns:
-        # Convert string weekday to int 0=Monday,...6=Sunday
-        df_local["weekday"] = pd.to_datetime(df_local["weekday"], errors="coerce").dt.weekday.fillna(0).astype(int)
-    if "is_weekend" in df_local.columns:
-        df_local["is_weekend"] = df_local["is_weekend"].map({True:1, False:0, "True":1, "False":0}).fillna(0).astype(int)
-    if "festival_flag" in df_local.columns:
-        df_local["festival_flag"] = df_local["festival_flag"].map({True:1, False:0, "True":1, "False":0}).fillna(0).astype(int)
+    # Convert categorical/object columns to numeric
+    object_cols = ["train_frequency", "weekday", "is_weekend", "festival_flag"]
+    for col in object_cols:
+        df_local[col] = pd.to_numeric(df_local[col], errors="coerce").fillna(0)
 
-    # ------------------- EXISTING FEATURES -------------------
+    # Feature engineering
     df_local["long_route"] = (df_local["duration_hours"] > 24).astype(int)
     df_local["wl_ratio"] = df_local.apply(
         lambda row: row["wl_position"] / {"SL": 100, "3A": 72, "2A": 48}.get(row["class"], 100),
@@ -631,6 +662,7 @@ def get_top_trains(df_route, user_class_value):
     df_local["train_type_enc"] = train_type_le.transform(df_local["train_type"])
     df_local["class_enc"] = df_local["class"].map(class_mapping)
 
+    # Select features
     features = [
         "train_type_enc", "class_enc", "halts", "duration_hours",
         "train_frequency", "days_before_journey", "weekday", "is_weekend",
@@ -639,17 +671,23 @@ def get_top_trains(df_route, user_class_value):
         "congestion_per_halt"
     ]
 
-    X = df_local[features]
+    X = df_local[features].copy()
 
-    # Predict probability
+    # Ensure all columns are numeric
+    X = X.apply(pd.to_numeric, errors="coerce").fillna(0)
+
+    # Prediction
     df_local["pred_prob"] = model.predict_proba(X)[:, 1]
 
+    # Filter and sort
     filtered = df_local[df_local["class_enc"] == user_class_encoded]
     filtered = filtered.sort_values(by="pred_prob", ascending=False)
     filtered = filtered.drop_duplicates(subset=["train_no", "train_name"], keep="first")
 
     return filtered.sort_values(by="pred_prob", ascending=False)
 
+
+    
 # ---------------------------------------------------------
 # GAUGE CHART – SUBTLE, PREMIUM COLORS
 # ---------------------------------------------------------
@@ -689,9 +727,6 @@ route_df = df[
 # ---------------------------------------------------------
 # DISPLAY RESULTS – INSIDE PREMIUM WRAPPER
 # ---------------------------------------------------------
-# ---------------------------------------------------------
-# DISPLAY RESULTS – INSIDE PREMIUM WRAPPER
-# ---------------------------------------------------------
 st.markdown('<div class="results-shell">', unsafe_allow_html=True)
 
 if predict_btn:
@@ -705,11 +740,12 @@ if predict_btn:
         else:
             st.markdown("#### 🚆 Recommended trains for your journey")
 
+            # ✅ Correctly indented for loop
             for idx, row in top_trains.iterrows():
                 is_best = idx == top_trains.index[0]
                 probability_value = row.pred_prob * 100
 
-                # Train card (text content only)
+                # Train card HTML
                 st.markdown(
                     f"""
                     <div class="train-card">
@@ -722,16 +758,26 @@ if predict_btn:
                                 <div style="font-size:11px; color:#6b7280; margin-top:4px;">
                                     Halts: {row.halts} · Avg delay: {int(row.avg_delay_min)} min · WL position: {int(row.wl_position)}
                                 </div>
-                                {"<span class='best-badge'>BEST MATCH</span>" if is_best else ""}
+                                {f'<span class="best-badge">BEST MATCH</span>' if is_best else ''}
+                            </div>
+                            <div style="width:130px; text-align:center;">
+                                <div class="progress-ring" style="--p:{probability_value:.0f}">
+                                    <div class="progress-ring-inner">
+                                        <div class="progress-ring-inner-main">{probability_value:.0f}%</div>
+                                        <div class="progress-ring-inner-label">Chance</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     """,
-                    unsafe_allow_html=True   # ← THIS LINE WAS MISSING
+                    unsafe_allow_html=True
                 )
-                
 
-                # Message below each train
+                # Gauge chart
+                probability_gauge(row.pred_prob, key=f"gauge_{row.train_no}_{idx}")
+
+                # Confirmation chance message
                 if row.pred_prob >= 0.75:
                     st.success("High confirmation chance – strongly recommended.")
                 elif row.pred_prob >= 0.45:
@@ -741,11 +787,23 @@ if predict_btn:
 
                 st.divider()
 
+                # Live train status
+                rapidapi_key = "34556d9462msh33dac86393efc71p1d1a90jsnda9e34a609f8"  
+                live_status = get_live_train_status(row.train_no, rapidapi_key)
+
+                if "error" in live_status:
+                    st.info(f"Live status not available: {live_status['error']}")
+                else:
+                    st.markdown(f"**Current station:** {live_status.get('currentStation', 'N/A')}")
+                    st.markdown(f"**Late by:** {live_status.get('lateBy', 'N/A')} minutes")
+                    st.markdown(f"**Next station:** {live_status.get('nextStation', 'N/A')}")
+
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 # ---------------------------------------------------------
 # FOOTER
 # ---------------------------------------------------------
-st.markdown(
-    '<div class="footer">Smart Train Selector · AI-powered decision assistant for Indian Railways journeys</div>',
-    unsafe_allow_html=True
-)
-c
+st.markdown('<div class="footer">Smart Train Selector · AI-powered decision assistant for Indian Railways journeys</div>', unsafe_allow_html=True)
+# app.py
+
