@@ -1,8 +1,2 @@
-scikit-learn==1.7.2
-pandas
-numpy
-joblib
 streamlit
 requests
-plotly
-xgboost==2.0.3
