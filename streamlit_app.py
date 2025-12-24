@@ -16,7 +16,7 @@ st.write("Live train status using IRCTC API")
 # ---------------------------------------------------------
 # API CONFIG (USE STREAMLIT SECRETS)
 # ---------------------------------------------------------
-RAPIDAPI_KEY = st.secrets["RAPIDAPI_KEY"]
+RAPIDAPI_KEY = st.secrets["34556d9462msh33dac86393efc71p1d1a90jsnda9e34a609f8"]
 
 API_URL = "https://irctc1.p.rapidapi.com/api/v1/getLiveTrainStatus"
 
